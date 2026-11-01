@@ -1,0 +1,30 @@
+{
+  "name": "@anasnare/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anasnare/scanner": "*",
+    "better-sqlite3": "^11.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "open": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/cookie-parser": "^1.4.0",
+    "@types/cors": "^2.8.0",
+    "@types/express": "^5.0.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.0",
+    "tsx": "^4.0.0",
+    "vitest": "^2.0.0"
+  }
+}

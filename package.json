@@ -1,0 +1,20 @@
+{
+  "name": "anasnare",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/scanner",
+    "packages/server",
+    "packages/ui"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npx concurrently -n scanner,server,ui -c blue,green,magenta \"npm run dev -w packages/scanner\" \"npm run dev -w packages/server\" \"npm run dev -w packages/ui\"",
+    "start": "node packages/server/dist/index.js",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}
