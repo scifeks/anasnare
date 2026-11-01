@@ -6,17 +6,16 @@ export const visibilityDetector: DetectorModule = {
   getInjectionCode(_reportFnName: string): string {
     return `
 (function visibilityDetector(){
-  var _visReads={};
+  var _visReadCount=0;
   try{
     var origHidden=Object.getOwnPropertyDescriptor(Document.prototype,'hidden');
     if(origHidden&&origHidden.get){
       _saveToStr(origHidden.get);
       Object.defineProperty(Document.prototype,'hidden',{
         get:function(){
-          var src=getCallerScript();
-          _visReads[src]=(_visReads[src]||0)+1;
-          if(_visReads[src]>3){
-            _reportDet({category:'visibility',signal:'visibility_api_abuse',weight:0.05,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{readCount:_visReads[src]}});
+          _visReadCount++;
+          if(_visReadCount>3){
+            _reportDet({category:'visibility',signal:'visibility_api_abuse',weight:0.05,timestamp:Date.now(),details:{readCount:_visReadCount}});
           }
           return false;
         },configurable:true,enumerable:true
@@ -29,10 +28,9 @@ export const visibilityDetector: DetectorModule = {
       _saveToStr(origState.get);
       Object.defineProperty(Document.prototype,'visibilityState',{
         get:function(){
-          var src=getCallerScript();
-          _visReads[src]=(_visReads[src]||0)+1;
-          if(_visReads[src]>3){
-            _reportDet({category:'visibility',signal:'visibility_api_abuse',weight:0.05,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{readCount:_visReads[src]}});
+          _visReadCount++;
+          if(_visReadCount>3){
+            _reportDet({category:'visibility',signal:'visibility_api_abuse',weight:0.05,timestamp:Date.now(),details:{readCount:_visReadCount}});
           }
           return'visible';
         },configurable:true,enumerable:true
@@ -51,7 +49,7 @@ export const visibilityDetector: DetectorModule = {
         cb(ts);
         performance.now=origPerfNow;
         if(perfCalled){
-          _reportDet({category:'visibility',signal:'raf_timing_probe',weight:0.05,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+          _reportDet({category:'visibility',signal:'raf_timing_probe',weight:0.05,timestamp:Date.now(),details:{}});
         }
       });
     };
@@ -62,10 +60,7 @@ export const visibilityDetector: DetectorModule = {
     _saveToStr(origAddEvent);
     EventTarget.prototype.addEventListener=function(type,listener,opts){
       if(type==='focus'||type==='blur'){
-        var src=getCallerScript();
-        if(src.indexOf(location.hostname)===-1&&src!=='inline/unknown'){
-          _reportDet({category:'visibility',signal:'focus_blur_monitoring',weight:0.05,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{eventType:type}});
-        }
+        _reportDet({category:'visibility',signal:'focus_blur_monitoring',weight:0.05,timestamp:Date.now(),details:{eventType:type}});
       }
       return origAddEvent.call(this,type,listener,opts);
     };

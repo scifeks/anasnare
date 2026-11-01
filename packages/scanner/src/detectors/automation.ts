@@ -12,7 +12,7 @@ export const automationDetector: DetectorModule = {
     if(origWdGet)_saveToStr(origWdGet);
     Object.defineProperty(Navigator.prototype,'webdriver',{
       get:function(){
-        _reportDet({category:'automation',signal:'webdriver_check',weight:0.45,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+        _reportDet({category:'automation',signal:'webdriver_check',weight:0.45,timestamp:Date.now(),details:{}});
         return undefined;
       },
       configurable:true,enumerable:true
@@ -24,7 +24,7 @@ export const automationDetector: DetectorModule = {
     try{
       Object.defineProperty(window,g,{
         get:function(){
-          _reportDet({category:'automation',signal:'automation_globals',weight:0.40,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{global:g}});
+          _reportDet({category:'automation',signal:'automation_globals',weight:0.40,timestamp:Date.now(),details:{global:g}});
           return undefined;
         },
         set:function(){},configurable:true,enumerable:false
@@ -36,7 +36,7 @@ export const automationDetector: DetectorModule = {
     try{
       Object.defineProperty(document,g,{
         get:function(){
-          _reportDet({category:'automation',signal:'automation_globals',weight:0.40,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{global:'document.'+g}});
+          _reportDet({category:'automation',signal:'automation_globals',weight:0.40,timestamp:Date.now(),details:{global:'document.'+g}});
           return undefined;
         },
         set:function(){},configurable:true,enumerable:false
@@ -48,7 +48,7 @@ export const automationDetector: DetectorModule = {
     var _origChrome=window.chrome;
     Object.defineProperty(window,'chrome',{
       get:function(){
-        _reportDet({category:'automation',signal:'chrome_runtime_probing',weight:0.30,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+        _reportDet({category:'automation',signal:'chrome_runtime_probing',weight:0.30,timestamp:Date.now(),details:{}});
         return _origChrome;
       },
       configurable:true,enumerable:true
@@ -60,7 +60,7 @@ export const automationDetector: DetectorModule = {
     _saveToStr(origGetParam);
     WebGLRenderingContext.prototype.getParameter=function(p){
       if(p===0x1F01||p===0x1F00){
-        _reportDet({category:'automation',signal:'webgl_renderer_probing',weight:0.35,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{param:p===0x1F01?'RENDERER':'VENDOR'}});
+        _reportDet({category:'automation',signal:'webgl_renderer_probing',weight:0.35,timestamp:Date.now(),details:{param:p===0x1F01?'RENDERER':'VENDOR'}});
       }
       if(p===0x1F01)return'ANGLE (Intel, Mesa Intel(R) UHD Graphics 630, OpenGL 4.6)';
       if(p===0x1F00)return'Google Inc. (Intel)';

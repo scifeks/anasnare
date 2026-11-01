@@ -1,8 +1,7 @@
 import type { DetectorModule, AdContextProvider } from './types.js';
 
 export function generateInjectionScript(
-  detectionReportFn: string,
-  adSlotReportFn: string,
+  bindingName: string,
   detectors: DetectorModule[],
   providers: AdContextProvider[],
 ): string {
@@ -11,8 +10,6 @@ export function generateInjectionScript(
 
   return `(function(){` +
 `var _JSON_stringify=JSON.stringify;` +
-`var _setTimeout=setTimeout;` +
-`var _Error=Error;` +
 // Spoof toString before any patched function can be inspected
 `var _toStrMap=new WeakMap();` +
 `var _origToStr=Function.prototype.toString;` +
@@ -25,38 +22,11 @@ export function generateInjectionScript(
   `};` +
   `_toStrMap.set(Function.prototype.toString,_origToStr.call(_origToStr));` +
 `}` +
-// Queue and flush for detection events
-`var _detQ=[];` +
 `function _reportDet(d){` +
-  `if(!d.stack)d.stack=new _Error().stack||'';` +
-  `if(!d.detected_at)d.detected_at=new Date().toISOString();` +
-  `try{window['${detectionReportFn}'](_JSON_stringify(d));}` +
-  `catch(e){_detQ.push(d);` +
-    `if(_detQ.length===1){(function poll(){_setTimeout(function(){try{_flushDet();}catch(e2){poll();}},50);})();}` +
-  `}` +
+  `globalThis['${bindingName}'](_JSON_stringify({type:'det',category:d.category,signal:d.signal,weight:d.weight,timestamp:d.timestamp,details:d.details}));` +
 `}` +
-`function _flushDet(){while(_detQ.length){var item=_detQ[0];window['${detectionReportFn}'](_JSON_stringify(item));_detQ.shift();}}` +
-`window.__anasnare_flushDet=_flushDet;` +
-// Queue and flush for ad slot events
-`var _adQ=[];` +
 `function _reportAd(d){` +
-  `try{window['${adSlotReportFn}'](_JSON_stringify(d));}` +
-  `catch(e){_adQ.push(d);` +
-    `if(_adQ.length===1){(function poll(){_setTimeout(function(){try{_flushAd();}catch(e2){poll();}},50);})();}` +
-  `}` +
-`}` +
-`function _flushAd(){while(_adQ.length){var item=_adQ[0];window['${adSlotReportFn}'](_JSON_stringify(item));_adQ.shift();}}` +
-`window.__anasnare_flushAd=_flushAd;` +
-// Caller script helper
-`var _marker='__anasnare_iife__';` +
-`function getCallerScript(){` +
-  `var s=(new _Error()).stack||'';` +
-  `var f=s.split('\\n').slice(2);` +
-  `for(var i=0;i<f.length;i++){` +
-    `var m=f[i].match(/https?:\\/\\/[^\\s\\)]+/);` +
-    `if(m&&m[0].indexOf(_marker)===-1)return m[0];` +
-  `}` +
-  `return 'inline/unknown';` +
+  `globalThis['${bindingName}'](_JSON_stringify({type:'ad',payload:d}));` +
 `}` +
 // Stealth patches (save originals for toString before patching)
 `(function stealthPatches(){` +

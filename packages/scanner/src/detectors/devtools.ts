@@ -6,23 +6,20 @@ export const devtoolsDetector: DetectorModule = {
   getInjectionCode(_reportFnName: string): string {
     return `
 (function devtoolsDetector(){
-  var _dimReads={};
-  var _dimPollCounts={};
+  var _dimReads={outer:0,inner:0};
+  var _dimPollCounts={count:0,firstAt:0};
   function trackDimRead(prop,kind){
-    var src=getCallerScript();
-    if(!_dimReads[src])_dimReads[src]={outer:0,inner:0};
-    if(!_dimPollCounts[src])_dimPollCounts[src]={count:0,firstAt:0};
-    _dimReads[src][kind]=Date.now();
-    if(_dimReads[src].outer&&_dimReads[src].inner&&Math.abs(_dimReads[src].outer-_dimReads[src].inner)<500){
-      _dimPollCounts[src].count++;
-      if(!_dimPollCounts[src].firstAt)_dimPollCounts[src].firstAt=Date.now();
-      if(_dimPollCounts[src].count>=3&&(Date.now()-_dimPollCounts[src].firstAt)<10000){
-        _reportDet({category:'devtools',signal:'outerheight_polling',weight:0.80,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:prop,pollCount:_dimPollCounts[src].count}});
-        _dimPollCounts[src]={count:0,firstAt:0};
-      } else if(_dimPollCounts[src].count===1){
-        _reportDet({category:'devtools',signal:'window_size_differential',weight:0.30,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:prop}});
+    _dimReads[kind]=Date.now();
+    if(_dimReads.outer&&_dimReads.inner&&Math.abs(_dimReads.outer-_dimReads.inner)<500){
+      _dimPollCounts.count++;
+      if(!_dimPollCounts.firstAt)_dimPollCounts.firstAt=Date.now();
+      if(_dimPollCounts.count>=3&&(Date.now()-_dimPollCounts.firstAt)<10000){
+        _reportDet({category:'devtools',signal:'outerheight_polling',weight:0.80,timestamp:Date.now(),details:{property:prop,pollCount:_dimPollCounts.count}});
+        _dimPollCounts={count:0,firstAt:0};
+      } else if(_dimPollCounts.count===1){
+        _reportDet({category:'devtools',signal:'window_size_differential',weight:0.30,timestamp:Date.now(),details:{property:prop}});
       }
-      _dimReads[src]={outer:0,inner:0};
+      _dimReads={outer:0,inner:0};
     }
   }
   ['outerHeight','outerWidth','innerHeight','innerWidth'].forEach(function(prop){
@@ -48,7 +45,7 @@ export const devtoolsDetector: DetectorModule = {
     console[m]=function(){
       var now=_origDateNow();
       if(now-_lastTiming<50){
-        _reportDet({category:'devtools',signal:'console_timing_probe',weight:0.35,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{method:m}});
+        _reportDet({category:'devtools',signal:'console_timing_probe',weight:0.35,timestamp:Date.now(),details:{method:m}});
       }
       return orig.apply(console,arguments);
     };
@@ -58,15 +55,15 @@ export const devtoolsDetector: DetectorModule = {
   try{
     var consoleProxy=new Proxy(console,{
       set:function(t,p,v){
-        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:String(p),action:'set'}});
+        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,timestamp:Date.now(),details:{property:String(p),action:'set'}});
         t[p]=v;return true;
       },
       defineProperty:function(t,p,d){
-        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:String(p),action:'defineProperty'}});
+        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,timestamp:Date.now(),details:{property:String(p),action:'defineProperty'}});
         Object.defineProperty(t,p,d);return true;
       },
       deleteProperty:function(t,p){
-        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:String(p),action:'delete'}});
+        _reportDet({category:'devtools',signal:'console_redefinition',weight:0.85,timestamp:Date.now(),details:{property:String(p),action:'delete'}});
         delete t[p];return true;
       }
     });
@@ -77,7 +74,7 @@ export const devtoolsDetector: DetectorModule = {
     try{
       Object.defineProperty(window,p,{
         get:function(){
-          _reportDet({category:'devtools',signal:'firebug_detection',weight:0.08,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:p}});
+          _reportDet({category:'devtools',signal:'firebug_detection',weight:0.08,timestamp:Date.now(),details:{property:p}});
           return undefined;
         },
         set:function(){},configurable:true,enumerable:false

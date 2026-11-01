@@ -6,3 +6,5 @@ export * from './types.js';
 export { getAllDetectors } from './detectors/index.js';
 export { getAllProviders } from './enrichment/index.js';
 export { generateInjectionScript } from './injector.js';
+export { ScriptRegistry } from './script-registry.js';
+export type { ScriptInfo, ScriptParsedEvent, ResolvedAttribution } from './script-registry.js';

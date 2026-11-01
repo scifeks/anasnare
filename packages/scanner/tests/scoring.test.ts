@@ -74,4 +74,46 @@ describe('scoreScan', () => {
     expect(scores[0].signalCount).toBe(1);
     expect(scores[0].weightSum).toBeCloseTo(0.15);
   });
+
+  it('skips vendor allowlist discounts when sourceURLSpoofed is true', () => {
+    const detections: DetectionEvent[] = [
+      {
+        ...base,
+        sourceScript: 'https://cdn.doubleverify.com/dvtp.js',
+        category: 'automation',
+        signal: 'webdriver_check',
+        weight: 0.45,
+        sourceURLSpoofed: true,
+      },
+      {
+        ...base,
+        sourceScript: 'https://cdn.doubleverify.com/dvtp.js',
+        category: 'fingerprinting',
+        signal: 'canvas_fingerprint',
+        weight: 0.15,
+        sourceURLSpoofed: true,
+      },
+    ];
+    const scores = scoreScan(detections, ['*.doubleverify.com']);
+    const s = scores[0];
+    expect(s.isVendorAllowlisted).toBe(true);
+    expect(s.sourceURLSpoofed).toBe(true);
+    expect(s.effectiveWeightSum).toBeCloseTo(0.45 + 0.15);
+  });
+
+  it('applies vendor discounts when sourceURLSpoofed is false', () => {
+    const detections: DetectionEvent[] = [
+      {
+        ...base,
+        sourceScript: 'https://cdn.doubleverify.com/dvtp.js',
+        category: 'automation',
+        signal: 'webdriver_check',
+        weight: 0.45,
+        sourceURLSpoofed: false,
+      },
+    ];
+    const scores = scoreScan(detections, ['*.doubleverify.com']);
+    expect(scores[0].sourceURLSpoofed).toBe(false);
+    expect(scores[0].effectiveWeightSum).toBeCloseTo(0.45 * 0.5);
+  });
 });

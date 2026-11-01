@@ -15,6 +15,7 @@ export interface ScriptScore {
   effectiveWeightSum: number;
   threatScore: number;
   isVendorAllowlisted: boolean;
+  sourceURLSpoofed: boolean;
 }
 
 export function matchesAllowlist(hostname: string, patterns: string[]): boolean {
@@ -56,6 +57,8 @@ export function scoreScan(
       if (!uniqueSignals.has(det.signal)) uniqueSignals.set(det.signal, det);
     }
 
+    const isSpoofed = [...uniqueSignals.values()].some(d => d.sourceURLSpoofed === true);
+
     const categories = new Set<string>();
     let weightSum = 0;
     let effectiveWeightSum = 0;
@@ -65,7 +68,7 @@ export function scoreScan(
       weightSum += det.weight;
 
       let effectiveWeight = det.weight;
-      if (isAllowlisted) {
+      if (isAllowlisted && !isSpoofed) {
         if (det.weight >= TIER_1_MIN) {
           effectiveWeight = det.weight;
         } else if (det.weight >= TIER_2_MIN) {
@@ -89,6 +92,7 @@ export function scoreScan(
       effectiveWeightSum,
       threatScore: effectiveWeightSum * multiplier,
       isVendorAllowlisted: isAllowlisted,
+      sourceURLSpoofed: isSpoofed,
     });
   }
 

@@ -5,7 +5,7 @@ import type { DetectorModule, AdContextProvider } from '../src/types.js';
 const mockDetector: DetectorModule = {
   category: 'test',
   getInjectionCode(reportFnName: string) {
-    return `${reportFnName}({ category: 'test', signal: 'mock', weight: 0.5, sourceScript: 'test.js', stack: '', timestamp: Date.now(), details: {} });`;
+    return `${reportFnName}({ category: 'test', signal: 'mock', weight: 0.5, timestamp: Date.now(), details: {} });`;
   },
 };
 
@@ -18,48 +18,52 @@ const mockProvider: AdContextProvider = {
 
 describe('generateInjectionScript', () => {
   it('wraps code in an IIFE', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [mockDetector], []);
+    const code = generateInjectionScript('__bind_abc', [mockDetector], []);
     expect(code).toMatch(/^\(function\(\)\{/);
     expect(code).toMatch(/\}\)\(\);$/);
   });
 
-  it('includes both report function names', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [mockDetector], [mockProvider]);
-    expect(code).toContain('__rpt');
-    expect(code).toContain('__rptAd');
+  it('references the binding name for report functions', () => {
+    const code = generateInjectionScript('__bind_abc', [mockDetector], [mockProvider]);
+    expect(code).toContain('__bind_abc');
   });
 
   it('includes detector code', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [mockDetector], []);
+    const code = generateInjectionScript('__bind_abc', [mockDetector], []);
     expect(code).toContain("signal: 'mock'");
   });
 
   it('includes ad context provider code', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [], [mockProvider]);
+    const code = generateInjectionScript('__bind_abc', [], [mockProvider]);
     expect(code).toContain("provider: 'test'");
   });
 
   it('includes Layer 2 toString stealth', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [], []);
+    const code = generateInjectionScript('__bind_abc', [], []);
     expect(code).toContain('WeakMap');
     expect(code).toContain('toString');
     expect(code).toContain('[native code]');
   });
 
   it('includes stealth patches', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [], []);
+    const code = generateInjectionScript('__bind_abc', [], []);
     expect(code).toContain('webdriver');
     expect(code).toContain('navigator');
   });
 
-  it('includes queue-and-flush for both channels', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [], []);
-    expect(code).toContain('_detQ');
-    expect(code).toContain('_adQ');
+  it('does not include queue/flush or getCallerScript', () => {
+    const code = generateInjectionScript('__bind_abc', [], []);
+    expect(code).not.toContain('_detQ');
+    expect(code).not.toContain('_adQ');
+    expect(code).not.toContain('__anasnare_flushDet');
+    expect(code).not.toContain('__anasnare_flushAd');
+    expect(code).not.toContain('getCallerScript');
+    expect(code).not.toContain('_marker');
   });
 
-  it('includes getCallerScript helper', () => {
-    const code = generateInjectionScript('__rpt', '__rptAd', [], []);
-    expect(code).toContain('getCallerScript');
+  it('calls binding with type field for detections and ads', () => {
+    const code = generateInjectionScript('__bind_abc', [mockDetector], [mockProvider]);
+    expect(code).toContain("type:'det'");
+    expect(code).toContain("type:'ad'");
   });
 });

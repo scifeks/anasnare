@@ -2,8 +2,9 @@ export interface DetectionEvent {
   category: string;
   signal: string;
   weight: number;
-  sourceScript: string;
-  stack: string;
+  sourceScript?: string;
+  stack?: string;
+  sourceURLSpoofed?: boolean;
   timestamp: number;
   details: Record<string, unknown>;
   adContext?: {

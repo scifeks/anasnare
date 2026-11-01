@@ -35,6 +35,7 @@ export interface Detection {
   details: string | null;
   ad_slot_id: number | null;
   count: number;
+  source_url_spoofed: number;
   detected_at: string;
 }
 
@@ -52,6 +53,7 @@ export interface ScanScript {
   effective_weight_sum: number;
   threat_score: number;
   is_vendor_allowlisted: number;
+  source_url_spoofed: number;
   assessed_at: string;
 }
 

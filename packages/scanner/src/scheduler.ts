@@ -11,13 +11,13 @@ export interface DbOperations {
     scan_id: number; site_id: number; category: string; signal_name: string;
     weight: number; source_script_url?: string | null; source_script_hash?: string | null;
     stack_trace?: string | null; initiator_chain?: string | null; details?: string | null;
-    ad_slot_id?: number | null; count?: number;
+    ad_slot_id?: number | null; count?: number; source_url_spoofed?: number;
   }): number;
   insertScanScript(ss: {
     scan_id: number; site_id: number; script_url: string; script_hash?: string | null;
     initiator_chain?: string | null; signal_count: number; category_count: number;
     categories: string; weight_sum: number; effective_weight_sum: number;
-    threat_score: number; is_vendor_allowlisted: number;
+    threat_score: number; is_vendor_allowlisted: number; source_url_spoofed?: number;
   }): number;
   insertAdSlot(slot: {
     scan_id: number; site_id: number; provider: string; slot_id: string;
@@ -69,13 +69,13 @@ export async function runSiteScan(
 
     const dedupCounts = new Map<string, number>();
     for (const det of result.detections) {
-      const key = `${det.signal}:${det.sourceScript}`;
+      const key = `${det.signal}:${det.sourceScript ?? ''}`;
       dedupCounts.set(key, (dedupCounts.get(key) ?? 0) + 1);
     }
 
     const seen = new Set<string>();
     for (const det of result.detections) {
-      const key = `${det.signal}:${det.sourceScript}`;
+      const key = `${det.signal}:${det.sourceScript ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
       ops.insertDetection({
@@ -83,11 +83,12 @@ export async function runSiteScan(
         signal_name: det.signal, weight: det.weight,
         source_script_url: det.sourceScript || null,
         stack_trace: det.stack || null,
-        initiator_chain: result.scriptInitiators[det.sourceScript]
-          ? JSON.stringify(result.scriptInitiators[det.sourceScript])
+        initiator_chain: result.scriptInitiators[det.sourceScript ?? '']
+          ? JSON.stringify(result.scriptInitiators[det.sourceScript ?? ''])
           : null,
         details: Object.keys(det.details).length > 0 ? JSON.stringify(det.details) : null,
-        ad_slot_id: findAdSlotForScript(det.sourceScript), count: dedupCounts.get(key) ?? 1,
+        ad_slot_id: findAdSlotForScript(det.sourceScript ?? ''), count: dedupCounts.get(key) ?? 1,
+        source_url_spoofed: det.sourceURLSpoofed ? 1 : 0,
       });
     }
 
@@ -102,6 +103,7 @@ export async function runSiteScan(
         weight_sum: score.weightSum, effective_weight_sum: score.effectiveWeightSum,
         threat_score: score.threatScore,
         is_vendor_allowlisted: score.isVendorAllowlisted ? 1 : 0,
+        source_url_spoofed: score.sourceURLSpoofed ? 1 : 0,
       });
     }
 

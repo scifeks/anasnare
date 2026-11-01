@@ -70,6 +70,7 @@ const SCHEMA = `
     details TEXT,
     ad_slot_id INTEGER REFERENCES scan_ad_slots(id) ON DELETE SET NULL,
     count INTEGER NOT NULL DEFAULT 1,
+    source_url_spoofed INTEGER NOT NULL DEFAULT 0,
     detected_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -87,6 +88,7 @@ const SCHEMA = `
     effective_weight_sum REAL NOT NULL,
     threat_score REAL NOT NULL,
     is_vendor_allowlisted INTEGER NOT NULL DEFAULT 0,
+    source_url_spoofed INTEGER NOT NULL DEFAULT 0,
     assessed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -187,11 +189,12 @@ function tierToWeightRange(tier: number): { min: number; max: number } {
 }
 
 export function insertDetection(db: Database.Database, det: Partial<Detection> & Pick<Detection, 'scan_id' | 'site_id' | 'category' | 'signal_name' | 'weight'>): number {
-  const result = db.prepare('INSERT INTO detections (scan_id, site_id, category, signal_name, weight, source_script_url, source_script_hash, stack_trace, initiator_chain, details, ad_slot_id, count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+  const result = db.prepare('INSERT INTO detections (scan_id, site_id, category, signal_name, weight, source_script_url, source_script_hash, stack_trace, initiator_chain, details, ad_slot_id, count, source_url_spoofed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
     det.scan_id, det.site_id, det.category, det.signal_name, det.weight,
     det.source_script_url ?? null, det.source_script_hash ?? null,
     det.stack_trace ?? null, det.initiator_chain ?? null,
     det.details ?? null, det.ad_slot_id ?? null, det.count ?? 1,
+    det.source_url_spoofed ?? 0,
   );
   return result.lastInsertRowid as number;
 }
@@ -241,11 +244,11 @@ export function listDetectionsByCampaign(db: Database.Database, opts: ListOption
 }
 
 export function insertScanScript(db: Database.Database, ss: Omit<ScanScript, 'id' | 'assessed_at'> & { script_hash?: string; initiator_chain?: string }): number {
-  const result = db.prepare('INSERT INTO scan_scripts (scan_id, site_id, script_url, script_hash, initiator_chain, signal_count, category_count, categories, weight_sum, effective_weight_sum, threat_score, is_vendor_allowlisted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+  const result = db.prepare('INSERT INTO scan_scripts (scan_id, site_id, script_url, script_hash, initiator_chain, signal_count, category_count, categories, weight_sum, effective_weight_sum, threat_score, is_vendor_allowlisted, source_url_spoofed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
     ss.scan_id, ss.site_id, ss.script_url, ss.script_hash ?? null,
     ss.initiator_chain ?? null, ss.signal_count, ss.category_count,
     ss.categories, ss.weight_sum, ss.effective_weight_sum,
-    ss.threat_score, ss.is_vendor_allowlisted,
+    ss.threat_score, ss.is_vendor_allowlisted, ss.source_url_spoofed ?? 0,
   );
   return result.lastInsertRowid as number;
 }

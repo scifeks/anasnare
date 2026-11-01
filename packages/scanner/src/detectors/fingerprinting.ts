@@ -10,13 +10,13 @@ export const fingerprintingDetector: DetectorModule = {
     var origToDataURL=HTMLCanvasElement.prototype.toDataURL;
     _saveToStr(origToDataURL);
     HTMLCanvasElement.prototype.toDataURL=function(){
-      _reportDet({category:'fingerprinting',signal:'canvas_fingerprint',weight:0.15,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{method:'toDataURL'}});
+      _reportDet({category:'fingerprinting',signal:'canvas_fingerprint',weight:0.15,timestamp:Date.now(),details:{method:'toDataURL'}});
       return origToDataURL.apply(this,arguments);
     };
     var origGetImageData=CanvasRenderingContext2D.prototype.getImageData;
     _saveToStr(origGetImageData);
     CanvasRenderingContext2D.prototype.getImageData=function(){
-      _reportDet({category:'fingerprinting',signal:'canvas_fingerprint',weight:0.15,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{method:'getImageData'}});
+      _reportDet({category:'fingerprinting',signal:'canvas_fingerprint',weight:0.15,timestamp:Date.now(),details:{method:'getImageData'}});
       return origGetImageData.apply(this,arguments);
     };
   }catch(e){}
@@ -27,7 +27,7 @@ export const fingerprintingDetector: DetectorModule = {
       _saveToStr(origHC.get);
       Object.defineProperty(Navigator.prototype,'hardwareConcurrency',{
         get:function(){
-          _reportDet({category:'fingerprinting',signal:'hardware_concurrency_check',weight:0.12,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+          _reportDet({category:'fingerprinting',signal:'hardware_concurrency_check',weight:0.12,timestamp:Date.now(),details:{}});
           return 8;
         },configurable:true,enumerable:true
       });
@@ -36,7 +36,7 @@ export const fingerprintingDetector: DetectorModule = {
   try{
     Object.defineProperty(Navigator.prototype,'deviceMemory',{
       get:function(){
-        _reportDet({category:'fingerprinting',signal:'device_memory_check',weight:0.12,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+        _reportDet({category:'fingerprinting',signal:'device_memory_check',weight:0.12,timestamp:Date.now(),details:{}});
         return 8;
       },configurable:true,enumerable:true
     });
@@ -50,7 +50,7 @@ export const fingerprintingDetector: DetectorModule = {
       var origGet=orig.get;
       Object.defineProperty(Screen.prototype,prop,{
         get:function(){
-          _reportDet({category:'fingerprinting',signal:'screen_resolution_check',weight:0.10,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{property:prop}});
+          _reportDet({category:'fingerprinting',signal:'screen_resolution_check',weight:0.10,timestamp:Date.now(),details:{property:prop}});
           return origGet.call(this);
         },configurable:true,enumerable:true
       });
@@ -58,24 +58,20 @@ export const fingerprintingDetector: DetectorModule = {
   }catch(e){}
 
   try{
-    var _clockReads={};
+    var _clockReads={date:0,perf:0};
     var origDateNow=Date.now;
     var origPerfNow=performance.now.bind(performance);
     Date.now=function(){
-      var src=getCallerScript();
-      if(!_clockReads[src])_clockReads[src]={date:0,perf:0};
-      _clockReads[src].date=origDateNow();
-      if(_clockReads[src].perf&&(origDateNow()-_clockReads[src].perf)<100){
-        _reportDet({category:'fingerprinting',signal:'clock_drift_detection',weight:0.10,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+      _clockReads.date=origDateNow();
+      if(_clockReads.perf&&(origDateNow()-_clockReads.perf)<100){
+        _reportDet({category:'fingerprinting',signal:'clock_drift_detection',weight:0.10,timestamp:Date.now(),details:{}});
       }
-      return _clockReads[src].date;
+      return _clockReads.date;
     };
     performance.now=function(){
-      var src=getCallerScript();
-      if(!_clockReads[src])_clockReads[src]={date:0,perf:0};
-      _clockReads[src].perf=origDateNow();
-      if(_clockReads[src].date&&(origDateNow()-_clockReads[src].date)<100){
-        _reportDet({category:'fingerprinting',signal:'clock_drift_detection',weight:0.10,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+      _clockReads.perf=origDateNow();
+      if(_clockReads.date&&(origDateNow()-_clockReads.date)<100){
+        _reportDet({category:'fingerprinting',signal:'clock_drift_detection',weight:0.10,timestamp:Date.now(),details:{}});
       }
       return origPerfNow();
     };
@@ -88,7 +84,7 @@ export const fingerprintingDetector: DetectorModule = {
       var origPLGet=origPluginsLen.get;
       Object.defineProperty(PluginArray.prototype,'length',{
         get:function(){
-          _reportDet({category:'fingerprinting',signal:'plugin_enumeration',weight:0.08,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+          _reportDet({category:'fingerprinting',signal:'plugin_enumeration',weight:0.08,timestamp:Date.now(),details:{}});
           return origPLGet.call(this);
         },configurable:true,enumerable:true
       });
@@ -99,7 +95,7 @@ export const fingerprintingDetector: DetectorModule = {
     var origIntl=Intl.DateTimeFormat.prototype.resolvedOptions;
     _saveToStr(origIntl);
     Intl.DateTimeFormat.prototype.resolvedOptions=function(){
-      _reportDet({category:'fingerprinting',signal:'timezone_locale_check',weight:0.08,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+      _reportDet({category:'fingerprinting',signal:'timezone_locale_check',weight:0.08,timestamp:Date.now(),details:{}});
       return origIntl.call(this);
     };
   }catch(e){}
@@ -109,7 +105,7 @@ export const fingerprintingDetector: DetectorModule = {
     if(origGetBattery){
       _saveToStr(origGetBattery);
       Navigator.prototype.getBattery=function(){
-        _reportDet({category:'fingerprinting',signal:'battery_api',weight:0.05,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+        _reportDet({category:'fingerprinting',signal:'battery_api',weight:0.05,timestamp:Date.now(),details:{}});
         return origGetBattery.call(this);
       };
     }
@@ -122,7 +118,7 @@ export const fingerprintingDetector: DetectorModule = {
       var origConnGet=origConn.get;
       Object.defineProperty(Navigator.prototype,'connection',{
         get:function(){
-          _reportDet({category:'fingerprinting',signal:'connection_api',weight:0.05,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+          _reportDet({category:'fingerprinting',signal:'connection_api',weight:0.05,timestamp:Date.now(),details:{}});
           return origConnGet.call(this);
         },configurable:true,enumerable:true
       });
@@ -133,12 +129,11 @@ export const fingerprintingDetector: DetectorModule = {
     var origPermsQuery=Permissions.prototype.query;
     if(origPermsQuery){
       _saveToStr(origPermsQuery);
-      var _permsCount={};
+      var _permsCount=0;
       Permissions.prototype.query=function(desc){
-        var src=getCallerScript();
-        _permsCount[src]=(_permsCount[src]||0)+1;
-        if(_permsCount[src]>=2){
-          _reportDet({category:'fingerprinting',signal:'permissions_probing',weight:0.05,sourceScript:src,stack:(new Error()).stack||'',timestamp:Date.now(),details:{queryCount:_permsCount[src],permission:desc&&desc.name}});
+        _permsCount++;
+        if(_permsCount>=2){
+          _reportDet({category:'fingerprinting',signal:'permissions_probing',weight:0.05,timestamp:Date.now(),details:{queryCount:_permsCount,permission:desc&&desc.name}});
         }
         return origPermsQuery.call(this,desc);
       };

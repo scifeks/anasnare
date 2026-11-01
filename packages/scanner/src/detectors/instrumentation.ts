@@ -11,7 +11,7 @@ export const instrumentationDetector: DetectorModule = {
 
   Function.prototype.toString=function(){
     if(_hookedFns.has(this)){
-      _reportDet({category:'instrumentation',signal:'tostring_integrity_check',weight:0.90,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{checkedFunction:(_hookedFns.get(this)||'').slice(0,100)}});
+      _reportDet({category:'instrumentation',signal:'tostring_integrity_check',weight:0.90,timestamp:Date.now(),details:{checkedFunction:(_hookedFns.get(this)||'').slice(0,100)}});
     }
     var saved=_hookedFns.get(this);
     if(saved!==undefined)return saved;
@@ -27,13 +27,10 @@ export const instrumentationDetector: DetectorModule = {
         get:function(){
           var stack=_origStackGet.call(this);
           if(stack&&typeof stack==='string'){
-            var caller=getCallerScript();
-            if(caller!=='inline/unknown'){
-              var lines=stack.split('\\n');
-              var hasInspection=lines.some(function(l){return l.indexOf('toString')!==-1||l.indexOf('__anasnare')!==-1;});
-              if(hasInspection){
-                _reportDet({category:'instrumentation',signal:'error_stack_inspection',weight:0.75,sourceScript:caller,stack:stack,timestamp:Date.now(),details:{stackLength:lines.length}});
-              }
+            var lines=stack.split('\\n');
+            var hasInspection=lines.some(function(l){return l.indexOf('toString')!==-1||l.indexOf('__anasnare')!==-1;});
+            if(hasInspection){
+              _reportDet({category:'instrumentation',signal:'error_stack_inspection',weight:0.75,timestamp:Date.now(),details:{stackLength:lines.length}});
             }
           }
           return stack;
@@ -47,7 +44,7 @@ export const instrumentationDetector: DetectorModule = {
     var _fnToStr=Function.prototype.toString;
     Object.defineProperty(Function.prototype.toString,'toString',{
       value:function(){
-        _reportDet({category:'instrumentation',signal:'tostring_override_detection',weight:0.30,sourceScript:getCallerScript(),stack:(new Error()).stack||'',timestamp:Date.now(),details:{}});
+        _reportDet({category:'instrumentation',signal:'tostring_override_detection',weight:0.30,timestamp:Date.now(),details:{}});
         return _realToString.call(_fnToStr);
       }
     });
