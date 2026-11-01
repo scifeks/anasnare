@@ -137,6 +137,30 @@ async function setupCdpSession(cdp: CDPSession, ctx: ScanContext): Promise<void>
 
   await cdp.send('Runtime.addBinding', { name: ctx.bindingName });
   await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: ctx.wrapperScript });
+
+  await cdp.send('Target.setAutoAttach', {
+    autoAttach: true,
+    waitForDebuggerOnStart: true,
+    flatten: true,
+  });
+
+  (cdp as unknown as { on(event: string, cb: (params: Record<string, unknown>) => void): void }).on(
+    'Target.attachedToTarget',
+    (params) => {
+      const info = params.targetInfo as { type: string };
+      const sessionId = params.sessionId as string;
+      const childCdp = (cdp as unknown as { session(id: string): CDPSession }).session(sessionId);
+      if (!childCdp) return;
+
+      if (info.type !== 'iframe') {
+        childCdp.send('Runtime.runIfWaitingForDebugger').catch(() => {});
+        return;
+      }
+
+      setupCdpSession(childCdp, ctx)
+        .finally(() => { childCdp.send('Runtime.runIfWaitingForDebugger').catch(() => {}); });
+    },
+  );
 }
 
 export async function runScan(siteId: number, pageUrl: string): Promise<ScanResult> {
@@ -201,32 +225,6 @@ export async function runScan(siteId: number, pageUrl: string): Promise<ScanResu
 
     await cdp.send('Page.enable');
     await setupCdpSession(cdp, ctx);
-
-    await cdp.send('Target.setAutoAttach', {
-      autoAttach: true,
-      waitForDebuggerOnStart: true,
-      flatten: true,
-    });
-
-    (cdp as unknown as { on(event: string, cb: (params: Record<string, unknown>) => void): void }).on(
-      'Target.attachedToTarget',
-      (params) => {
-        const info = params.targetInfo as { type: string };
-        const sessionId = params.sessionId as string;
-        if (info.type !== 'iframe') {
-          cdp.send('Runtime.runIfWaitingForDebugger', { targetId: sessionId } as never).catch(() => {});
-          return;
-        }
-        const childCdp = (cdp as unknown as { session(id: string): CDPSession }).session(sessionId);
-        if (!childCdp) {
-          cdp.send('Runtime.runIfWaitingForDebugger', { targetId: sessionId } as never).catch(() => {});
-          return;
-        }
-        setupCdpSession(childCdp, ctx)
-          .then(() => childCdp.send('Runtime.runIfWaitingForDebugger'))
-          .catch(() => {});
-      },
-    );
 
     await context.addInitScript(iife);
 
