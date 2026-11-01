@@ -16,12 +16,10 @@ const DEDUP_CAP = 5;
 
 type CallFrame = { scriptId: string; url: string; lineNumber: number; columnNumber: number };
 
-interface SessionContext {
+interface ScanContext {
   bindingName: string;
   magic: string;
   wrapperScript: string;
-  registry: ScriptRegistry;
-  nonceStacks: Map<string, CallFrame[]>;
   addDetection: (evt: DetectionEvent) => void;
   adSlots: AdSlotEvent[];
   scriptInitiators: Record<string, string[]>;
@@ -29,7 +27,16 @@ interface SessionContext {
   cdpHandlers: CDPHandler[];
 }
 
-async function setupCdpSession(cdp: CDPSession, ctx: SessionContext): Promise<void> {
+function isValidAdSlot(v: unknown): v is AdSlotEvent {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.provider === 'string' && typeof o.slotId === 'string' && Array.isArray(o.scriptUrls);
+}
+
+async function setupCdpSession(cdp: CDPSession, ctx: ScanContext): Promise<void> {
+  const registry = new ScriptRegistry();
+  const nonceStacks = new Map<string, CallFrame[]>();
+
   await cdp.send('Debugger.enable');
   await cdp.send('Network.enable');
   await cdp.send('Runtime.enable');
@@ -37,7 +44,7 @@ async function setupCdpSession(cdp: CDPSession, ctx: SessionContext): Promise<vo
   cdp.on('Debugger.scriptParsed', (params) => {
     const parentFrame = (params.stackTrace as { callFrames?: Array<{ scriptId: string }> } | undefined)?.callFrames?.[0];
     const rawParams = params as typeof params & { sourceURL?: string };
-    ctx.registry.register({
+    registry.register({
       scriptId: params.scriptId as string,
       url: params.url as string,
       hasSourceURL: Boolean(params.hasSourceURL),
@@ -81,7 +88,7 @@ async function setupCdpSession(cdp: CDPSession, ctx: SessionContext): Promise<vo
     if (args.length < 2 || args[0]?.value !== ctx.magic) return;
     const nonce = String(args[1].value);
     const frames = (params.stackTrace as { callFrames?: CallFrame[] })?.callFrames;
-    if (frames) ctx.nonceStacks.set(nonce, frames);
+    if (frames) nonceStacks.set(nonce, frames);
   });
 
   cdp.on('Runtime.bindingCalled', (params) => {
@@ -89,22 +96,22 @@ async function setupCdpSession(cdp: CDPSession, ctx: SessionContext): Promise<vo
     let envelope: { nonce: string; raw: string };
     try { envelope = JSON.parse(params.payload as string); } catch { return; }
 
+    const stack = nonceStacks.get(envelope.nonce);
+    nonceStacks.delete(envelope.nonce);
+    if (!stack) return;
+
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(envelope.raw); } catch { return; }
 
-    const stack = ctx.nonceStacks.get(envelope.nonce);
-    ctx.nonceStacks.delete(envelope.nonce);
-
     if (parsed.type === 'ad') {
-      ctx.adSlots.push(parsed.payload as AdSlotEvent);
+      if (isValidAdSlot(parsed.payload)) ctx.adSlots.push(parsed.payload);
       return;
     }
-    if (!stack) return;
 
     let sourceScript = 'inline/unknown';
     let sourceURLSpoofed = false;
     for (const frame of stack) {
-      const resolved = ctx.registry.resolve(frame.scriptId);
+      const resolved = registry.resolve(frame.scriptId);
       if (resolved.url !== 'inline/unknown') {
         sourceScript = resolved.url;
         sourceURLSpoofed = resolved.spoofed;
@@ -139,9 +146,6 @@ export async function runScan(siteId: number, pageUrl: string): Promise<ScanResu
   const dedupCounts = new Map<string, number>();
   const scriptsAnalyzed = { count: 0 };
 
-  const registry = new ScriptRegistry();
-  const nonceStacks = new Map<string, CallFrame[]>();
-
   const addDetection = (evt: DetectionEvent): void => {
     const key = `${evt.signal}:${evt.sourceScript ?? 'unknown'}`;
     const count = dedupCounts.get(key) ?? 0;
@@ -159,21 +163,23 @@ export async function runScan(siteId: number, pageUrl: string): Promise<ScanResu
   const wrapperScript = `(() => {
     const nativeBinding = globalThis['${bindingName}'];
     const dbg = console.debug;
+    const _stringify = JSON.stringify;
+    const _random = Math.random;
     let seq = 0;
     Object.defineProperty(globalThis, '${bindingName}', {
       configurable: false, writable: false, enumerable: false,
       value: function(payload) {
-        const nonce = (++seq) + ':' + Math.random().toString(36).slice(2);
+        const nonce = (++seq) + ':' + _random().toString(36).slice(2);
         dbg(${JSON.stringify(magic)}, nonce);
-        nativeBinding(JSON.stringify({ nonce: nonce, raw: payload }));
+        nativeBinding(_stringify({ nonce: nonce, raw: payload }));
       }
     });
   })();`;
 
   const cdpHandlers = detectors.flatMap(d => d.getCDPHandlers?.() ?? []);
 
-  const ctx: SessionContext = {
-    bindingName, magic, wrapperScript, registry, nonceStacks,
+  const ctx: ScanContext = {
+    bindingName, magic, wrapperScript,
     addDetection, adSlots, scriptInitiators, scriptsAnalyzed, cdpHandlers,
   };
 
@@ -196,19 +202,31 @@ export async function runScan(siteId: number, pageUrl: string): Promise<ScanResu
     await cdp.send('Page.enable');
     await setupCdpSession(cdp, ctx);
 
-    const attachedFrames = new Set<import('playwright').Frame>();
-    async function attachChildFrame(frame: import('playwright').Frame): Promise<void> {
-      if (attachedFrames.has(frame) || frame === page.mainFrame()) return;
-      attachedFrames.add(frame);
-      try {
-        const childCdp = await page.context().newCDPSession(frame);
-        await setupCdpSession(childCdp, ctx);
-      } catch {
-        // Same-origin frames share the parent session and already have the binding
-      }
-    }
+    await cdp.send('Target.setAutoAttach', {
+      autoAttach: true,
+      waitForDebuggerOnStart: true,
+      flatten: true,
+    });
 
-    page.on('framenavigated', (frame) => { attachChildFrame(frame).catch(() => {}); });
+    (cdp as unknown as { on(event: string, cb: (params: Record<string, unknown>) => void): void }).on(
+      'Target.attachedToTarget',
+      (params) => {
+        const info = params.targetInfo as { type: string };
+        const sessionId = params.sessionId as string;
+        if (info.type !== 'iframe') {
+          cdp.send('Runtime.runIfWaitingForDebugger', { targetId: sessionId } as never).catch(() => {});
+          return;
+        }
+        const childCdp = (cdp as unknown as { session(id: string): CDPSession }).session(sessionId);
+        if (!childCdp) {
+          cdp.send('Runtime.runIfWaitingForDebugger', { targetId: sessionId } as never).catch(() => {});
+          return;
+        }
+        setupCdpSession(childCdp, ctx)
+          .then(() => childCdp.send('Runtime.runIfWaitingForDebugger'))
+          .catch(() => {});
+      },
+    );
 
     await context.addInitScript(iife);
 
